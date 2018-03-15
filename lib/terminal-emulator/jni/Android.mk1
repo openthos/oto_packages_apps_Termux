@@ -1,0 +1,16 @@
+LOCAL_PATH:= $(call my-dir)
+include $(CLEAR_VARS)
+#LOCAL_LDFLAGS   := -Wl,--build-id, --gc-sections
+LOCAL_CFLAGS := -std=c11, -Wall, -Wextra, -Werror, -Os, -fno-stack-protector, -Wl,--gc-sections
+LOCAL_MODULE := libtermux
+##LOCAL_LDLIBS := \
+##        -llog \
+##        -lc \
+##        -lm 
+LOCAL_SRC_FILES := termux.c
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+LOCAL_ARM_MODE := x86_64
+LOCAL_MODULE_SUFFIX := .so
+#include $(BUILD_SHARED_LIBRARY)
+include $(BUILD_PREBUILT)

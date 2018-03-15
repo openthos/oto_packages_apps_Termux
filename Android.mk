@@ -1,17 +1,33 @@
-LOCAL_PATH := $(call my-dir)
+LOCAL_PATH:= $(call my-dir)
+
 include $(CLEAR_VARS)
 
-# Module name should match apk name to be installed.
-LOCAL_MODULE := Termux
-LOCAL_SRC_FILES := com.termux_60.apk
-LOCAL_MODULE_CLASS := APPS
-LOCAL_MODULE_SUFFIX := $(COMMON_ANDROID_PACKAGE_SUFFIX)
 LOCAL_MODULE_TAGS := optional
-LOCAL_CERTIFICATE := PRESIGNED
 
+LOCAL_STATIC_JAVA_LIBRARIES := android-support-v4
 
-LOCAL_LIBS := $(shell zipinfo -1 $(LOCAL_PATH)/$(LOCAL_SRC_FILES) | grep ^lib/ | grep -v /$$)
-LOCAL_MODULE_TARGET_ARCH := x86_64
-LOCAL_PREBUILT_JNI_LIBS := $(addprefix @,$(filter lib/$(LOCAL_MODULE_TARGET_ARCH)/%,$(LOCAL_LIBS)))
+LOCAL_SRC_FILES := $(call all-java-files-under, src) \
+        $(call all-java-files-under, lib/terminal-emulator/src) \
+        $(call all-java-files-under, lib/terminal-view/src) \
+        $(call all-java-files-under, lib/termux-styling/src)
 
-include $(BUILD_PREBUILT)
+LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/lib/termux-styling/res \
+        $(LOCAL_PATH)/lib/terminal-view/res $(LOCAL_PATH)/res
+
+LOCAL_AAPT_FLAGS := --auto-add-overlay
+
+LOCAL_OVERRIDES_PACKAGES := TermuxStyling
+
+LOCAL_PACKAGE_NAME := Termux
+LOCAL_CERTIFICATE := platform
+LOCAL_PRIVILEGED_MODULE := true
+LOCAL_JNI_SHARED_LIBRARIES := libtermux
+
+include $(BUILD_PACKAGE)
+include $(CLEAR_VARS)
+LOCAL_CFLAGS := -std=c11 -Wall  -Wextra  -Werror  -Os  -fno-stack-protector  -Wl,--gc-sections
+LOCAL_MODULE := libtermux
+LOCAL_SRC_FILES := lib/terminal-emulator/jni/termux.c
+LOCAL_MODULE_TAGS := optional
+LOCAL_ARM_MODE := x86_64
+include $(BUILD_SHARED_LIBRARY)
