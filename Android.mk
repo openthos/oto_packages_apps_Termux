@@ -16,7 +16,7 @@ LOCAL_RESOURCE_DIR := $(LOCAL_PATH)/lib/termux-styling/res \
 
 LOCAL_AAPT_FLAGS := --auto-add-overlay
 
-LOCAL_OVERRIDES_PACKAGES := TermuxStyling
+LOCAL_OVERRIDES_PACKAGES := TermuxStyling OtoTerminal
 
 LOCAL_PACKAGE_NAME := Termux
 LOCAL_CERTIFICATE := platform

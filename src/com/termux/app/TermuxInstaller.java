@@ -90,7 +90,10 @@ final class TermuxInstaller {
                     final List<Pair<String, String>> symlinks = new ArrayList<>(50);
 
                     final URL zipUrl = determineZipUrl();
-                    try (ZipInputStream zipInput = new ZipInputStream(zipUrl.openStream())) {
+                    //try (ZipInputStream zipInput = new ZipInputStream(zipUrl.openStream())) {
+                    try {
+                        ZipInputStream zipInput
+                                = new ZipInputStream(activity.getAssets().open("bootstrap.zip"));
                         ZipEntry zipEntry;
                         while ((zipEntry = zipInput.getNextEntry()) != null) {
                             if (zipEntry.getName().equals("SYMLINKS.txt")) {
@@ -123,6 +126,8 @@ final class TermuxInstaller {
                                 }
                             }
                         }
+                    } catch (Exception e){
+                        e.printStackTrace();
                     }
 
                     if (symlinks.isEmpty())
