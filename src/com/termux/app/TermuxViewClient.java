@@ -81,7 +81,7 @@ public final class TermuxViewClient implements TerminalViewClient {
             } else if (unicodeChar == 'r'/* rename */) {
                 mActivity.renameSession(currentSession);
             } else if (unicodeChar == 'c'/* create */) {
-                mActivity.addNewSession(false, null);
+                mActivity.addNewSession(false);
             } else if (unicodeChar == 'u' /* urls */) {
                 mActivity.showUrlSelection();
             } else if (unicodeChar == 'v') {
@@ -206,11 +206,6 @@ public final class TermuxViewClient implements TerminalViewClient {
                     AudioManager audio = (AudioManager) mActivity.getSystemService(Context.AUDIO_SERVICE);
                     audio.adjustSuggestedStreamVolume(AudioManager.ADJUST_SAME, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI);
                     break;
-
-                // Writing mode:
-                case 'q':
-                    mActivity.toggleShowExtraKeys();
-                    break;
             }
 
             if (resultingKeyCode != -1) {
@@ -234,7 +229,7 @@ public final class TermuxViewClient implements TerminalViewClient {
                     if (codePointLowerCase == shortcut.codePoint) {
                         switch (shortcut.shortcutAction) {
                             case TermuxPreferences.SHORTCUT_ACTION_CREATE_SESSION:
-                                mActivity.addNewSession(false, null);
+                                mActivity.addNewSession(false);
                                 return true;
                             case TermuxPreferences.SHORTCUT_ACTION_PREVIOUS_SESSION:
                                 mActivity.switchToSession(false);
