@@ -9,7 +9,8 @@ import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
-import android.os.Build;
+import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -36,22 +37,32 @@ import com.termux.terminal.TerminalBuffer;
 import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
 
-/** View displaying and interacting with a {@link TerminalSession}. */
+/**
+ * View displaying and interacting with a {@link TerminalSession}.
+ */
 public final class TerminalView extends View {
 
-    /** Log view key and IME events. */
+    /**
+     * Log view key and IME events.
+     */
     private static final boolean LOG_KEY_EVENTS = false;
 
-    /** The currently displayed terminal session, whose emulator is {@link #mEmulator}. */
+    /**
+     * The currently displayed terminal session, whose emulator is {@link #mEmulator}.
+     */
     TerminalSession mTermSession;
-    /** Our terminal emulator whose session is {@link #mTermSession}. */
+    /**
+     * Our terminal emulator whose session is {@link #mTermSession}.
+     */
     TerminalEmulator mEmulator;
 
     TerminalRenderer mRenderer;
 
     TerminalViewClient mClient;
 
-    /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
+    /**
+     * The top row of text to display. Ranges from -activeTranscriptRows to 0.
+     */
     int mTopRow;
 
     boolean mIsSelectingText = false, mIsDraggingLeftSelection, mInitialTextSelection;
@@ -63,17 +74,25 @@ public final class TerminalView extends View {
     float mScaleFactor = 1.f;
     final GestureAndScaleRecognizer mGestureRecognizer;
 
-    /** Keep track of where mouse touch event started which we report as mouse scroll. */
+    /**
+     * Keep track of where mouse touch event started which we report as mouse scroll.
+     */
     private int mMouseScrollStartX = -1, mMouseScrollStartY = -1;
-    /** Keep track of the time when a touch event leading to sending mouse scroll events started. */
+    /**
+     * Keep track of the time when a touch event leading to sending mouse scroll events started.
+     */
     private long mMouseStartDownTime = -1;
 
     final Scroller mScroller;
 
-    /** What was left in from scrolling movement. */
+    /**
+     * What was left in from scrolling movement.
+     */
     float mScrollRemainder;
 
-    /** If non-zero, this is the last unicode code point received if that was a combining character. */
+    /**
+     * If non-zero, this is the last unicode code point received if that was a combining character.
+     */
     int mCombiningAccent;
 
     public TerminalView(Context context, AttributeSet attributes) { // NO_UCD (unused code)
@@ -84,6 +103,13 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onUp(MotionEvent e) {
+                if (mIsSelectingText) {
+                    String selectedText = mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2).trim();
+                    if (selectedText.length() > 1) {
+                        mTermSession.clipboardText(selectedText);
+                    }
+                    cancelSelectingText();
+                }
                 mScrollRemainder = 0.0f;
                 if (mEmulator != null && mEmulator.isMouseTrackingActive() && !mIsSelectingText && !scrolledWithFinger) {
                     // Quick event processing when mouse tracking is active - do not wait for check of double tapping
@@ -100,7 +126,7 @@ public final class TerminalView extends View {
             public boolean onSingleTapUp(MotionEvent e) {
                 if (mEmulator == null) return true;
                 if (mIsSelectingText) {
-                    toggleSelectingText(null);
+//                    toggleSelectingText(0, 0);
                     return true;
                 }
                 requestFocus();
@@ -115,8 +141,36 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onScroll(MotionEvent e, float distanceX, float distanceY) {
-                if (mEmulator == null || mIsSelectingText) return true;
-                if (mEmulator.isMouseTrackingActive() && e.isFromSource(InputDevice.SOURCE_MOUSE)) {
+                if (mEmulator == null) return true;
+                if (mIsSelectingText) {
+                    float deltaX = e.getX() + distanceX - mSelectionDownX;
+                    float deltaY = e.getY() + distanceY - mSelectionDownY;
+                    int deltaCols = (int) Math.ceil(deltaX / mRenderer.mFontWidth);
+                    int deltaRows = (int) Math.ceil(deltaY / mRenderer.mFontLineSpacing);
+                    mSelectionDownX += deltaCols * mRenderer.mFontWidth;
+                    mSelectionDownY += deltaRows * mRenderer.mFontLineSpacing;
+                    if (mIsDraggingLeftSelection) {
+                        mSelX1 += deltaCols;
+                        mSelY1 += deltaRows;
+                    } else {
+                        mSelX2 += deltaCols;
+                        mSelY2 += deltaRows;
+                    }
+
+                    mSelX1 = Math.min(mEmulator.mColumns, Math.max(0, mSelX1));
+                    mSelX2 = Math.min(mEmulator.mColumns, Math.max(0, mSelX2));
+
+                    if (mSelY1 == mSelY2 && mSelX1 > mSelX2 || mSelY1 > mSelY2) {
+                        // Switch handles.
+                        mIsDraggingLeftSelection = !mIsDraggingLeftSelection;
+                        int tmpX1 = mSelX1, tmpY1 = mSelY1;
+                        mSelX1 = mSelX2;
+                        mSelY1 = mSelY2;
+                        mSelX2 = tmpX1;
+                        mSelY2 = tmpY1;
+                    }
+                    invalidate();
+                } else if (mEmulator.isMouseTrackingActive() && e.isFromSource(InputDevice.SOURCE_MOUSE)) {
                     // If moving with mouse pointer while pressing button, report that instead of scroll.
                     // This means that we never report moving with button press-events for touch input,
                     // since we cannot just start sending these events without a starting press event,
@@ -178,6 +232,9 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onDown(float x, float y) {
+
+                toggleSelectingText(x, y);
+
                 return false;
             }
 
@@ -189,12 +246,12 @@ public final class TerminalView extends View {
 
             @Override
             public void onLongPress(MotionEvent e) {
-                if (mGestureRecognizer.isInProgress()) return;
-                if (mClient.onLongPress(e)) return;
-                if (!mIsSelectingText) {
-                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                    toggleSelectingText(e);
-                }
+//                if (mGestureRecognizer.isInProgress()) return;
+//                if (mClient.onLongPress(e)) return;
+//                if (!mIsSelectingText) {
+//                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+//                    toggleSelectingText(e);
+//                }
             }
         });
         mScroller = new Scroller(context);
@@ -362,7 +419,7 @@ public final class TerminalView extends View {
             if (-mTopRow + rowShift > rowsInHistory) {
                 // .. unless we're hitting the end of history transcript, in which
                 // case we abort text selection and scroll to end.
-                toggleSelectingText(null);
+//                toggleSelectingText(null);
             } else {
                 skipScrolling = true;
                 mTopRow -= rowShift;
@@ -413,7 +470,9 @@ public final class TerminalView extends View {
         return true;
     }
 
-    /** Send a single mouse event code to the terminal. */
+    /**
+     * Send a single mouse event code to the terminal.
+     */
     void sendMouseEventCode(MotionEvent e, int button, boolean pressed) {
         int x = (int) (e.getX() / mRenderer.mFontWidth) + 1;
         int y = (int) ((e.getY() - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing) + 1;
@@ -430,7 +489,9 @@ public final class TerminalView extends View {
         mEmulator.sendMouseEvent(button, x, y, pressed);
     }
 
-    /** Perform a scroll, either from dragging the screen or by scrolling a mouse wheel. */
+    /**
+     * Perform a scroll, either from dragging the screen or by scrolling a mouse wheel.
+     */
     void doScroll(MotionEvent event, int rowsDown) {
         boolean up = rowsDown < 0;
         int amount = Math.abs(rowsDown);
@@ -448,7 +509,9 @@ public final class TerminalView extends View {
         }
     }
 
-    /** Overriding {@link View#onGenericMotionEvent(MotionEvent)}. */
+    /**
+     * Overriding {@link View#onGenericMotionEvent(MotionEvent)}.
+     */
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (mEmulator != null && event.isFromSource(InputDevice.SOURCE_MOUSE) && event.getAction() == MotionEvent.ACTION_SCROLL) {
@@ -462,11 +525,21 @@ public final class TerminalView extends View {
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
-    @TargetApi(23)
     public boolean onTouchEvent(MotionEvent ev) {
         if (mEmulator == null) return true;
         final int action = ev.getAction();
-
+        switch (action){
+            case MotionEvent.ACTION_DOWN:
+                if (ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY)){
+                    ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                    ClipData clipData = clipboard.getPrimaryClip();
+                    if (clipData != null) {
+                        CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
+                        if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
+                    }
+                    return true;
+                }
+        }
         if (mIsSelectingText) {
             int cy = (int) (ev.getY() / mRenderer.mFontLineSpacing) + mTopRow;
             int cx = (int) (ev.getX() / mRenderer.mFontWidth);
@@ -510,9 +583,6 @@ public final class TerminalView extends View {
                         mSelX2 = tmpX1;
                         mSelY2 = tmpY1;
                     }
-
-                    //if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                    //    mActionMode.invalidateContentRect();
                     invalidate();
                     break;
                 default:
@@ -524,13 +594,6 @@ public final class TerminalView extends View {
             if (ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY)) {
                 if (action == MotionEvent.ACTION_DOWN) showContextMenu();
                 return true;
-            } else if (ev.isButtonPressed(MotionEvent.BUTTON_TERTIARY)) {
-                ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clipData = clipboard.getPrimaryClip();
-                if (clipData != null) {
-                    CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
-                    if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
-                }
             } else if (mEmulator.isMouseTrackingActive()) { // BUTTON_PRIMARY.
                 switch (ev.getAction()) {
                     case MotionEvent.ACTION_DOWN:
@@ -555,7 +618,7 @@ public final class TerminalView extends View {
             Log.i(EmulatorDebug.LOG_TAG, "onKeyPreIme(keyCode=" + keyCode + ", event=" + event + ")");
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (mIsSelectingText) {
-                toggleSelectingText(null);
+//                toggleSelectingText(null);
                 return true;
             } else if (mClient.shouldBackButtonBeMappedToEscape()) {
                 // Intercept back button to treat it as escape:
@@ -695,7 +758,9 @@ public final class TerminalView extends View {
         }
     }
 
-    /** Input the specified keyCode if applicable and return if the input was consumed. */
+    /**
+     * Input the specified keyCode if applicable and return if the input was consumed.
+     */
     public boolean handleKeyCode(int keyCode, int keyMod) {
         TerminalEmulator term = mTermSession.getEmulator();
         String code = KeyHandler.getCode(keyCode, keyMod, term.isCursorKeysApplicationMode(), term.isKeypadApplicationMode());
@@ -737,7 +802,9 @@ public final class TerminalView extends View {
         updateSize();
     }
 
-    /** Check if the terminal size in rows and columns should be updated. */
+    /**
+     * Check if the terminal size in rows and columns should be updated.
+     */
     public void updateSize() {
         int viewWidth = getWidth();
         int viewHeight = getHeight();
@@ -781,138 +848,190 @@ public final class TerminalView extends View {
         }
     }
 
-    /** Toggle text selection mode in the view. */
-    @TargetApi(23)
-    public void toggleSelectingText(MotionEvent ev) {
-        mIsSelectingText = !mIsSelectingText;
-        mClient.copyModeChanged(mIsSelectingText);
-
-        if (mIsSelectingText) {
-            if (mLeftSelectionHandle == null) {
-                mLeftSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_left_material);
-                mRightSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_right_material);
-            }
-
-            int cx = (int) (ev.getX() / mRenderer.mFontWidth);
-            final boolean eventFromMouse = ev.isFromSource(InputDevice.SOURCE_MOUSE);
-            // Offset for finger:
-            final int SELECT_TEXT_OFFSET_Y = eventFromMouse ? 0 : -40;
-            int cy = (int) ((ev.getY() + SELECT_TEXT_OFFSET_Y) / mRenderer.mFontLineSpacing) + mTopRow;
-
-            mSelX1 = mSelX2 = cx;
-            mSelY1 = mSelY2 = cy;
-
-            TerminalBuffer screen = mEmulator.getScreen();
-            if (!" ".equals(screen.getSelectedText(mSelX1, mSelY1, mSelX1, mSelY1))) {
-                // Selecting something other than whitespace. Expand to word.
-                while (mSelX1 > 0 && !"".equals(screen.getSelectedText(mSelX1 - 1, mSelY1, mSelX1 - 1, mSelY1))) {
-                    mSelX1--;
-                }
-                while (mSelX2 < mEmulator.mColumns - 1 && !"".equals(screen.getSelectedText(mSelX2 + 1, mSelY1, mSelX2 + 1, mSelY1))) {
-                    mSelX2++;
-                }
-            }
-
-            mInitialTextSelection = true;
-            mIsDraggingLeftSelection = true;
-            mSelectionDownX = ev.getX();
-            mSelectionDownY = ev.getY();
-
-            final ActionMode.Callback callback = new ActionMode.Callback() {
-                @Override
-                public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-                    int show = MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT;
-
-                    ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                    menu.add(Menu.NONE, 1, Menu.NONE, R.string.copy_text).setShowAsAction(show);
-                    menu.add(Menu.NONE, 2, Menu.NONE, R.string.paste_text).setEnabled(clipboard.hasPrimaryClip()).setShowAsAction(show);
-                    menu.add(Menu.NONE, 3, Menu.NONE, R.string.text_selection_more);
-                    return true;
-                }
-
-                @Override
-                public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                    return false;
-                }
-
-                @Override
-                public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-                    if (!mIsSelectingText) {
-                        // Fix issue where the dialog is pressed while being dismissed.
-                        return true;
-                    }
-                    switch (item.getItemId()) {
-                        case 1:
-                            String selectedText = mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2).trim();
-                            mTermSession.clipboardText(selectedText);
-                            break;
-                        case 2:
-                            ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                            ClipData clipData = clipboard.getPrimaryClip();
-                            if (clipData != null) {
-                                CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
-                                if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
-                            }
-                            break;
-                        case 3:
-                            showContextMenu();
-                            break;
-                    }
-                    toggleSelectingText(null);
-                    return true;
-                }
-
-                @Override
-                public void onDestroyActionMode(ActionMode mode) {
-                }
-
-            };
-
-            //if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            //    mActionMode = startActionMode(new ActionMode.Callback2() {
-            //        @Override
-            //        public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-            //            return callback.onCreateActionMode(mode, menu);
-            //        }
-
-            //        @Override
-            //        public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-            //            return false;
-            //        }
-
-            //        @Override
-            //        public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-            //            return callback.onActionItemClicked(mode, item);
-            //        }
-
-            //        @Override
-            //        public void onDestroyActionMode(ActionMode mode) {
-            //            // Ignore.
-            //        }
-
-            //        @Override
-            //        public void onGetContentRect(ActionMode mode, View view, Rect outRect) {
-            //            int x1 = Math.round(mSelX1 * mRenderer.mFontWidth);
-            //            int x2 = Math.round(mSelX2 * mRenderer.mFontWidth);
-            //            int y1 = Math.round((mSelY1 - mTopRow) * mRenderer.mFontLineSpacing);
-            //            int y2 = Math.round((mSelY2 + 1 - mTopRow) * mRenderer.mFontLineSpacing);
-            //            outRect.set(Math.min(x1, x2), y1, Math.max(x1, x2), y2);
-            //        }
-            //    }, ActionMode.TYPE_FLOATING);
-            //} else {
-            //    mActionMode = startActionMode(callback);
-            //}
-            mActionMode = startActionMode(callback);
-            invalidate();
-        } else {
-            mActionMode.finish();
-            mSelX1 = mSelY1 = mSelX2 = mSelY2 = -1;
-            invalidate();
-        }
-    }
-
+    /**
+     * Toggle text selection mode in the view.
+     */
+//    public void toggleSelectingText(MotionEvent ev) {
+//        Log.i("wwww", "toggleSelectingText");
+//        mIsSelectingText = !mIsSelectingText;
+//        mClient.copyModeChanged(mIsSelectingText);
+//
+//        if (mIsSelectingText) {
+//            if (mLeftSelectionHandle == null) {
+//                mLeftSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_left_material);
+//                mRightSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_right_material);
+//            }
+//
+//            int cx = (int) (ev.getX() / mRenderer.mFontWidth);
+//            final boolean eventFromMouse = ev.isFromSource(InputDevice.SOURCE_MOUSE);
+//            // Offset for finger:
+//            final int SELECT_TEXT_OFFSET_Y = eventFromMouse ? 0 : -40;
+//            int cy = (int) ((ev.getY() + SELECT_TEXT_OFFSET_Y) / mRenderer.mFontLineSpacing) + mTopRow;
+//
+//            mSelX1 = mSelX2 = cx;
+//            mSelY1 = mSelY2 = cy;
+//
+//            TerminalBuffer screen = mEmulator.getScreen();
+//            if (!" ".equals(screen.getSelectedText(mSelX1, mSelY1, mSelX1, mSelY1))) {
+//                // Selecting something other than whitespace. Expand to word.
+//                while (mSelX1 > 0 && !"".equals(screen.getSelectedText(mSelX1 - 1, mSelY1, mSelX1 - 1, mSelY1))) {
+//                    mSelX1--;
+//                }
+//                while (mSelX2 < mEmulator.mColumns - 1 && !"".equals(screen.getSelectedText(mSelX2 + 1, mSelY1, mSelX2 + 1, mSelY1))) {
+//                    mSelX2++;
+//                }
+//            }
+//
+//            mInitialTextSelection = true;
+//            mIsDraggingLeftSelection = true;
+//            mSelectionDownX = ev.getX();
+//            mSelectionDownY = ev.getY();
+//
+//            final ActionMode.Callback callback = new ActionMode.Callback() {
+//                @Override
+//                public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+//                    int show = MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT;
+//
+//                    ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+//                    menu.add(Menu.NONE, 1, Menu.NONE, R.string.copy_text).setShowAsAction(show);
+//                    menu.add(Menu.NONE, 2, Menu.NONE, R.string.paste_text).setEnabled(clipboard.hasPrimaryClip()).setShowAsAction(show);
+//                    menu.add(Menu.NONE, 3, Menu.NONE, R.string.text_selection_more);
+//                    return true;
+//                }
+//
+//                @Override
+//                public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+//                    return false;
+//                }
+//
+//                @Override
+//                public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+//                    if (!mIsSelectingText) {
+//                        // Fix issue where the dialog is pressed while being dismissed.
+//                        return true;
+//                    }
+//                    switch (item.getItemId()) {
+//                        case 1:
+//                            String selectedText = mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2).trim();
+//                            mTermSession.clipboardText(selectedText);
+//                            break;
+//                        case 2:
+//                            ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+//                            ClipData clipData = clipboard.getPrimaryClip();
+//                            if (clipData != null) {
+//                                CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
+//                                if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
+//                            }
+//                            break;
+//                        case 3:
+//                            showContextMenu();
+//                            break;
+//                    }
+//                    toggleSelectingText(null);
+//                    return true;
+//                }
+//
+//                @Override
+//                public void onDestroyActionMode(ActionMode mode) {
+//                }
+//
+//            };
+////            mActionMode = startActionMode(callback);
+//            invalidate();
+//        } else {
+////            mActionMode.finish();
+//            mSelX1 = mSelY1 = mSelX2 = mSelY2 = -1;
+//            invalidate();
+//        }
+//    }
     public TerminalSession getCurrentSession() {
         return mTermSession;
     }
 
+    private void toggleSelectingText(float x, float y) {
+        mIsSelectingText = true;
+        mClient.copyModeChanged(mIsSelectingText);
+        if (mLeftSelectionHandle == null) {
+            mLeftSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_left_material);
+            mRightSelectionHandle = (BitmapDrawable) getContext().getDrawable(R.drawable.text_select_handle_right_material);
+        }
+        int cx = (int) (x / mRenderer.mFontWidth);
+        int cy = (int) (y / mRenderer.mFontLineSpacing) + mTopRow;
+        mSelX1 = mSelX2 = cx;
+        mSelY1 = mSelY2 = cy;
+        TerminalBuffer screen = mEmulator.getScreen();
+//        if (!" ".equals(screen.getSelectedText(mSelX1, mSelY1, mSelX1, mSelY1))) {
+//            while (mSelX1 > 0 && !"".equals(screen.getSelectedText(mSelX1 - 1, mSelY1, mSelX1 - 1, mSelY1))) {
+//                mSelX1--;
+//            }
+//            while (mSelX2 < mEmulator.mColumns - 1 && !"".equals(screen.getSelectedText(mSelX2 + 1, mSelY1, mSelX2 + 1, mSelY1))) {
+//                mSelX2++;
+//            }
+//        }
+
+        mInitialTextSelection = true;
+        mIsDraggingLeftSelection = true;
+        mSelectionDownX = x;
+        mSelectionDownY = y;
+
+        final ActionMode.Callback callback = new ActionMode.Callback() {
+            @Override
+            public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                int show = MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_WITH_TEXT;
+
+                ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                menu.add(Menu.NONE, 1, Menu.NONE, R.string.copy_text).setShowAsAction(show);
+                menu.add(Menu.NONE, 2, Menu.NONE, R.string.paste_text).setEnabled(clipboard.hasPrimaryClip()).setShowAsAction(show);
+                menu.add(Menu.NONE, 3, Menu.NONE, R.string.text_selection_more);
+                return true;
+            }
+
+            @Override
+            public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                return false;
+            }
+
+            @Override
+            public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                if (!mIsSelectingText) {
+                    // Fix issue where the dialog is pressed while being dismissed.
+                    return true;
+                }
+                switch (item.getItemId()) {
+                    case 1:
+                        String selectedText = mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2).trim();
+                        mTermSession.clipboardText(selectedText);
+                        break;
+                    case 2:
+                        ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                        ClipData clipData = clipboard.getPrimaryClip();
+                        if (clipData != null) {
+                            CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
+                            if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
+                        }
+                        break;
+                    case 3:
+                        showContextMenu();
+                        break;
+                }
+//                    toggleSelectingText(null);
+                return true;
+            }
+
+            @Override
+            public void onDestroyActionMode(ActionMode mode) {
+            }
+
+        };
+//            mActionMode = startActionMode(callback);
+        invalidate();
+    }
+
+
+    private void cancelSelectingText() {
+        mIsSelectingText = false;
+        mClient.copyModeChanged(mIsSelectingText);
+        mSelX1 = mSelY1 = mSelX2 = mSelY2 = -1;
+        invalidate();
+    }
 }
