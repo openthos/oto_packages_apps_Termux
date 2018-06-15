@@ -1,23 +1,18 @@
 package com.termux.view;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
-import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.ActionMode;
-import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -528,9 +523,9 @@ public final class TerminalView extends View {
     public boolean onTouchEvent(MotionEvent ev) {
         if (mEmulator == null) return true;
         final int action = ev.getAction();
-        switch (action){
+        switch (action) {
             case MotionEvent.ACTION_DOWN:
-                if (ev.isButtonPressed(MotionEvent.BUTTON_SECONDARY)){
+                if (ev.isButtonPressed(MotionEvent.BUTTON_TERTIARY)) {
                     ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
                     ClipData clipData = clipboard.getPrimaryClip();
                     if (clipData != null) {
@@ -629,6 +624,15 @@ public final class TerminalView extends View {
                         return onKeyUp(keyCode, event);
                 }
             }
+        } else if (keyCode == KeyEvent.KEYCODE_V && event.isCtrlPressed() && event.isShiftPressed()
+                && event.getAction() == MotionEvent.ACTION_DOWN) {
+            ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clipData = clipboard.getPrimaryClip();
+            if (clipData != null) {
+                CharSequence paste = clipData.getItemAt(0).coerceToText(getContext());
+                if (!TextUtils.isEmpty(paste)) mEmulator.paste(paste.toString());
+            }
+            return true;
         }
         return super.onKeyPreIme(keyCode, event);
     }

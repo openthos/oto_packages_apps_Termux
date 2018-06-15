@@ -1,8 +1,6 @@
 package com.termux.app;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -12,54 +10,35 @@ import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnShowListener;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.view.PagerAdapter;
-import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
-import android.text.SpannableString;
-import android.text.Spanned;
 import android.text.TextUtils;
-import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
-import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
-import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.view.inputmethod.InputMethodManager;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
 
 import com.termux.R;
 import com.termux.terminal.EmulatorDebug;
@@ -107,7 +86,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
 
     private static final String RELOAD_STYLE_ACTION = "com.termux.app.reload_style";
 
-    /** The main view of the activity showing the terminal. Initialized in onCreate(). */
+    /**
+     * The main view of the activity showing the terminal. Initialized in onCreate().
+     */
     @SuppressWarnings("NullableProblems")
     @NonNull
     TerminalView mTerminalView;
@@ -117,7 +98,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     TermuxPreferences mSettings;
 
     private LinearLayout mLlTopSwitch;
-    private ImageView mIvAdd;
+    private ImageView mIvAdd, mIvMenu;
     private HashMap<String, TerminalSession> mTerminalSessionMap;
     private TerminalSession mCurrentTermSession;
     private TextView mCurTopTv;
@@ -131,7 +112,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
      */
     TermuxService mTermService;
 
-    /** Initialized in {@link #onServiceConnected(ComponentName, IBinder)}. */
+    /**
+     * Initialized in {@link #onServiceConnected(ComponentName, IBinder)}.
+     */
     ArrayAdapter<TerminalSession> mListViewAdapter;
 
     /**
@@ -152,7 +135,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                 String whatToReload = intent.getStringExtra(RELOAD_STYLE_ACTION);
                 if ("storage".equals(whatToReload)) {
                     //if (ensureStoragePermissionGranted())
-                        TermuxInstaller.setupStorageSymlinks(TermuxActivity.this);
+                    TermuxInstaller.setupStorageSymlinks(TermuxActivity.this);
                     return;
                 }
                 checkForFontAndColors();
@@ -210,10 +193,10 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     //    }
     //}
 
-    private String addNewTopView () {
+    private String addNewTopView() {
         mSessionCount++;
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0);
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0);
         TextView tv = new TextView(this);
         tv.setTag(mSessionCount);
         tv.setOnClickListener(this);
@@ -227,7 +210,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         tv.setGravity(Gravity.CENTER_VERTICAL);
         String sessionName = tv.hashCode() + "";
         tv.setText(sessionName);
-        mLlTopSwitch.addView(tv, mLlTopSwitch.getChildCount() - 1);
+        mLlTopSwitch.addView(tv);
 
         params = new LinearLayout.LayoutParams(25, ViewGroup.LayoutParams.WRAP_CONTENT, 0);
         ImageView iv = new ImageView(this);
@@ -239,7 +222,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         params.height = 25;
         params.rightMargin = 5;
         iv.setLayoutParams(params);
-        mLlTopSwitch.addView(iv, mLlTopSwitch.getChildCount() - 1);
+        mLlTopSwitch.addView(iv);
         if (mCurTopTv != null && mCurTopIv != null) {
             mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_default);
             mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_default);
@@ -255,9 +238,12 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             case R.id.iv_add:
                 addNewSession(false);
                 break;
+            case R.id.iv_menu:
+                mTerminalView.showContextMenu();
+                break;
             default:
                 if (v == mCurTopTv) {
-                        return;
+                    return;
                 }
                 Integer tag = (Integer) v.getTag();
                 int ivChildIndex = tag * 2 - 1;
@@ -302,7 +288,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                         mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_selecte);
                         mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_selecte);
                     } else {
-                       finish();
+                        finish();
                     }
                 }
                 break;
@@ -318,8 +304,10 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         setContentView(R.layout.drawer_layout);
         mTerminalSessionMap = new HashMap<>();
         mLlTopSwitch = (LinearLayout) findViewById(R.id.ll_top_switch);
-        mIvAdd = (ImageView)findViewById(R.id.iv_add);
+        mIvAdd = (ImageView) findViewById(R.id.iv_add);
+        mIvMenu = (ImageView) findViewById(R.id.iv_menu);
         mIvAdd.setOnClickListener(this);
+        mIvMenu.setOnClickListener(this);
         mTerminalView = (TerminalView) findViewById(R.id.terminal_view);
         mTerminalView.setOnKeyListener(new TermuxViewClient(this));
 
@@ -339,17 +327,17 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         mBellSoundId = mBellSoundPool.load(this, R.raw.bell, 1);
     }
 
-    void toggleShowExtraKeys() {
-        final ViewPager viewPager = (ViewPager) findViewById(R.id.viewpager);
-        final boolean showNow = mSettings.toggleShowExtraKeys(TermuxActivity.this);
-        viewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
-        if (showNow && viewPager.getCurrentItem() == 1) {
-            // Focus the text input view if just revealed.
-            findViewById(R.id.text_input).requestFocus();
-        }
-    }
+//    void toggleShowExtraKeys() {
+//        final ViewPager viewPager = (ViewPager) findViewById(R.id.viewpager);
+//        final boolean showNow = mSettings.toggleShowExtraKeys(TermuxActivity.this);
+//        viewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
+//        if (showNow && viewPager.getCurrentItem() == 1) {
+//            // Focus the text input view if just revealed.
+//            findViewById(R.id.text_input).requestFocus();
+//        }
+//    }
 
-   /**
+    /**
      * Part of the {@link ServiceConnection} interface. The service is bound with
      * {@link #bindService(Intent, ServiceConnection, int)} in {@link #onCreate(Bundle)} which will cause a call to this
      * callback method.
@@ -444,6 +432,12 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                 addNewSession(false);
                 setDrawerLayoutTopMargin();
             } else {
+                List<TerminalSession> sessions = mTermService.getSessions();
+                for (TerminalSession s : sessions) {
+                    String sessionName = addNewTopView();
+                    Log.i("wwww", sessionName);
+                    mTerminalSessionMap.put(sessionName, s);
+                }
                 switchToSession(getStoredCurrentSessionOrLast());
             }
         }
@@ -451,7 +445,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
 
     private void setDrawerLayoutTopMargin() {
         RelativeLayout.LayoutParams drawerParams = new RelativeLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         mLlTopSwitch.measure(0, 0);
         drawerParams.topMargin = mLlTopSwitch.getMeasuredHeight();
         getDrawer().setLayoutParams(drawerParams);
@@ -558,7 +552,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         }
     }
 
-    /** Try switching to session and note about it, but do nothing if already displaying the session. */
+    /**
+     * Try switching to session and note about it, but do nothing if already displaying the session.
+     */
     void switchToSession(TerminalSession session) {
         if (mTerminalView.attachSession(session)) {
             noteSessionInfo();
@@ -600,7 +596,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         menu.add(Menu.NONE, CONTEXTMENU_HELP_ID, Menu.NONE, R.string.help);
     }
 
-    /** Hook system menu to show context menu instead. */
+    /**
+     * Hook system menu to show context menu instead.
+     */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         mTerminalView.showContextMenu();
@@ -735,7 +733,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             getCurrentTermSession().getEmulator().paste(paste.toString());
     }
 
-    /** The current session as stored or the last one if that does not exist. */
+    /**
+     * The current session as stored or the last one if that does not exist.
+     */
     public TerminalSession getStoredCurrentSessionOrLast() {
         TerminalSession stored = TermuxPreferences.getCurrentSession(this);
         if (stored != null) return stored;
