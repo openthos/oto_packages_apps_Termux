@@ -3,7 +3,6 @@ package com.termux.app;
 import android.content.Context;
 import android.media.AudioManager;
 import android.support.v4.widget.DrawerLayout;
-import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -20,7 +19,9 @@ public final class TermuxViewClient implements TerminalViewClient {
 
     final TermuxActivity mActivity;
 
-    /** Keeping track of the special keys acting as Ctrl and Fn for the soft keyboard and other hardware keys. */
+    /**
+     * Keeping track of the special keys acting as Ctrl and Fn for the soft keyboard and other hardware keys.
+     */
     boolean mVirtualControlKeyDown, mVirtualFnKeyDown;
 
     public TermuxViewClient(TermuxActivity activity) {
@@ -61,46 +62,42 @@ public final class TermuxViewClient implements TerminalViewClient {
         if (keyCode == KeyEvent.KEYCODE_ENTER && !currentSession.isRunning()) {
             mActivity.removeFinishedSession(currentSession);
             return true;
+        } else if (e.isCtrlPressed() && e.isShiftPressed()) {
+            // Get the unmodified code point:
+            int unicodeChar = e.getUnicodeChar(0);
+            if (unicodeChar == 'n'/* create */) {
+                mActivity.addNewSession(false);
+                return true;
+            }
         } else if (e.isCtrlPressed() && e.isAltPressed()) {
             // Get the unmodified code point:
             int unicodeChar = e.getUnicodeChar(0);
-
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || unicodeChar == 'n'/* next */) {
-                mActivity.switchToSession(true);
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP || unicodeChar == 'p' /* previous */) {
-                mActivity.switchToSession(false);
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                mActivity.getDrawer().openDrawer(Gravity.LEFT);
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                mActivity.getDrawer().closeDrawers();
-            } else if (unicodeChar == 'k'/* keyboard */) {
-                InputMethodManager imm = (InputMethodManager) mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
-            } else if (unicodeChar == 'm'/* menu */) {
+            if (unicodeChar == 'm'/* menu */) {
                 mActivity.mTerminalView.showContextMenu();
-            } else if (unicodeChar == 'r'/* rename */) {
-                mActivity.renameSession(currentSession);
-            } else if (unicodeChar == 'c'/* create */) {
-                mActivity.addNewSession(false);
-            } else if (unicodeChar == 'u' /* urls */) {
-                mActivity.showUrlSelection();
-            } else if (unicodeChar == 'v') {
-                mActivity.doPaste();
             } else if (unicodeChar == '+' || e.getUnicodeChar(KeyEvent.META_SHIFT_ON) == '+') {
                 // We also check for the shifted char here since shift may be required to produce '+',
                 // see https://github.com/termux/termux-api/issues/2
                 mActivity.changeFontSize(true);
             } else if (unicodeChar == '-') {
                 mActivity.changeFontSize(false);
-            } else if (unicodeChar >= '1' && unicodeChar <= '9') {
+            }
+            return true;
+        } else if (e.isAltPressed()) {
+            int unicodeChar = e.getUnicodeChar(0);
+            if (unicodeChar >= '1' && unicodeChar <= '9') {
                 int num = unicodeChar - '1';
                 TermuxService service = mActivity.mTermService;
                 if (service.getSessions().size() > num)
                     mActivity.switchToSession(service.getSessions().get(num));
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                mActivity.switchToSession(true);
+                return true;
+            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+                mActivity.switchToSession(false);
+                return true;
             }
-            return true;
         }
-
         return false;
 
     }
@@ -254,7 +251,9 @@ public final class TermuxViewClient implements TerminalViewClient {
         return false;
     }
 
-    /** Handle dedicated volume buttons as virtual keys if applicable. */
+    /**
+     * Handle dedicated volume buttons as virtual keys if applicable.
+     */
     private boolean handleVirtualKeys(int keyCode, KeyEvent event, boolean down) {
         InputDevice inputDevice = event.getDevice();
         if (inputDevice != null && inputDevice.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC) {

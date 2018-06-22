@@ -3,7 +3,6 @@ package com.termux.app;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -16,7 +15,6 @@ import android.content.ServiceConnection;
 import android.graphics.Typeface;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Vibrator;
@@ -51,9 +49,9 @@ import com.termux.view.TerminalView;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
@@ -74,15 +72,17 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
 
     private static final int CONTEXTMENU_SELECT_URL_ID = 0;
     private static final int CONTEXTMENU_SHARE_TRANSCRIPT_ID = 1;
-    private static final int CONTEXTMENU_PASTE_ID = 3;
-    private static final int CONTEXTMENU_KILL_PROCESS_ID = 4;
-    private static final int CONTEXTMENU_RESET_TERMINAL_ID = 5;
-    private static final int CONTEXTMENU_STYLING_ID = 6;
-    private static final int CONTEXTMENU_HELP_ID = 8;
+    private static final int CONTEXTMENU_PASTE_ID = 2;
+    private static final int CONTEXTMENU_KILL_PROCESS_ID = 3;
+    private static final int CONTEXTMENU_RESET_TERMINAL_ID = 4;
+    private static final int CONTEXTMENU_STYLING_ID = 5;
+    private static final int CONTEXTMENU_ZOOM_IN_ID = 6;
+    private static final int CONTEXTMENU_ZOOM_OUT_ID = 7;
+    private static final int CONTEXTMENU_SHOW_MENU_ID = 8;
+    private static final int CONTEXTMENU_NEW_TAB_ID = 9;
+    private static final int CONTEXTMENU_CHANGE_TAB_ID = 10;
 
     private static final int MAX_SESSIONS = 8;
-
-    private static final int REQUESTCODE_PERMISSION_STORAGE = 1234;
 
     private static final String RELOAD_STYLE_ACTION = "com.termux.app.reload_style";
 
@@ -99,11 +99,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
 
     private LinearLayout mLlTopSwitch;
     private ImageView mIvAdd, mIvMenu;
-    private HashMap<String, TerminalSession> mTerminalSessionMap;
-    private TerminalSession mCurrentTermSession;
-    private TextView mCurTopTv;
-    private ImageView mCurTopIv;
-    private int mSessionCount = 0;
+    private ArrayList<EmulatorBean> mBeans = new ArrayList<>();
 
     /**
      * The connection to the {@link TermuxService}. Requested in {@link #onCreate(Bundle)} with a call to
@@ -177,59 +173,15 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         }
     }
 
-    ///** For processes to access shared internal storage (/sdcard) we need this permission. */
-    //@TargetApi(Build.VERSION_CODES.M)
-    //public boolean ensureStoragePermissionGranted() {
-    //    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-    //        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-    //            return true;
-    //        } else {
-    //            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUESTCODE_PERMISSION_STORAGE);
-    //            return false;
-    //        }
-    //    } else {
-    //        // Always granted before Android 6.0.
-    //        return true;
-    //    }
-    //}
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
 
-    private String addNewTopView() {
-        mSessionCount++;
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0);
-        TextView tv = new TextView(this);
-        tv.setTag(mSessionCount);
-        tv.setOnClickListener(this);
-        tv.setTextSize(14);
-        tv.setBackgroundResource(R.drawable.shape_top_text_selecte);
-        params.width = 0;
-        params.height = 25;
-        params.weight = 1;
-        params.leftMargin = 5;
-        tv.setLayoutParams(params);
-        tv.setGravity(Gravity.CENTER_VERTICAL);
-        String sessionName = tv.hashCode() + "";
-        tv.setText(sessionName);
-        mLlTopSwitch.addView(tv);
-
-        params = new LinearLayout.LayoutParams(25, ViewGroup.LayoutParams.WRAP_CONTENT, 0);
-        ImageView iv = new ImageView(this);
-        iv.setTag(mSessionCount);
-        iv.setOnClickListener(this);
-        iv.setImageDrawable(getDrawable(R.drawable.remove));
-        iv.setBackgroundResource(R.drawable.shape_top_img_selecte);
-        params.width = 25;
-        params.height = 25;
-        params.rightMargin = 5;
-        iv.setLayoutParams(params);
-        mLlTopSwitch.addView(iv);
-        if (mCurTopTv != null && mCurTopIv != null) {
-            mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_default);
-            mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_default);
-        }
-        mCurTopTv = tv;
-        mCurTopIv = iv;
-        return sessionName;
+    private View addNewTopView() {
+        View v = View.inflate(this, R.layout.tab_item, null);
+        v.findViewById(R.id.close).setOnClickListener(this);
+        v.findViewById(R.id.title).setOnClickListener(this);
+        mLlTopSwitch.addView(v, params);
+        return v;
     }
 
     @Override
@@ -241,56 +193,24 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             case R.id.iv_menu:
                 mTerminalView.showContextMenu();
                 break;
+            case R.id.title:
+                for (EmulatorBean bean : mBeans) {
+                    if (bean.title == v) {
+                        switchToSession(bean.session);
+                        break;
+                    }
+                }
+                break;
+            case R.id.close:
+                for (EmulatorBean bean : mBeans) {
+                    if (bean.close == v) {
+                        bean.session.finishIfRunning();
+                        removeFinishedSession(bean.session);
+                        break;
+                    }
+                }
+                break;
             default:
-                if (v == mCurTopTv) {
-                    return;
-                }
-                Integer tag = (Integer) v.getTag();
-                int ivChildIndex = tag * 2 - 1;
-                int tvChildIndex = tag * 2 - 2;
-                if (v instanceof TextView) {
-                    // switch to session
-                    mCurrentTermSession = mTerminalSessionMap.get(((TextView) v).getText());
-                    switchToSession(mCurrentTermSession);
-                    v.setBackgroundResource(R.drawable.shape_top_text_selecte);
-                    if (mCurTopTv != null && mCurTopIv != null) {
-                        mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_default);
-                        mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_default);
-                    }
-                    mCurTopTv = (TextView) v;
-                    ImageView iv = (ImageView) mLlTopSwitch.getChildAt(ivChildIndex);
-                    iv.setBackgroundResource(R.drawable.shape_top_img_selecte);
-                    mCurTopIv = iv;
-                } else if (v instanceof ImageView) {
-                    // remove view
-                    if (mSessionCount > 1) {
-                        TextView tv = (TextView) mLlTopSwitch.getChildAt(tvChildIndex);
-                        String key = (String) tv.getText();
-                        removeFinishedSession(mTerminalSessionMap.get(key));
-                        mLlTopSwitch.removeViews(tvChildIndex, 2);
-                        mTerminalSessionMap.remove(key);
-                        mSessionCount--;
-                        if (mCurTopTv != null && mCurTopIv != null) {
-                            mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_default);
-                            mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_default);
-                        }
-                        if ((mLlTopSwitch.getChildCount() - 1) >= (tag * 2)) {
-                            for (int i = tvChildIndex; i < mLlTopSwitch.getChildCount() - 1; i++) {
-                                View view = mLlTopSwitch.getChildAt(i);
-                                view.setTag(((Integer) view.getTag()) - 1);
-                            }
-                            mCurTopTv = (TextView) mLlTopSwitch.getChildAt(tvChildIndex);
-                            mCurTopIv = (ImageView) mLlTopSwitch.getChildAt(ivChildIndex);
-                        } else {
-                            mCurTopTv = (TextView) mLlTopSwitch.getChildAt(tvChildIndex - 2);
-                            mCurTopIv = (ImageView) mLlTopSwitch.getChildAt(ivChildIndex - 2);
-                        }
-                        mCurTopTv.setBackgroundResource(R.drawable.shape_top_text_selecte);
-                        mCurTopIv.setBackgroundResource(R.drawable.shape_top_img_selecte);
-                    } else {
-                        finish();
-                    }
-                }
                 break;
         }
     }
@@ -302,7 +222,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         mSettings = new TermuxPreferences(this);
 
         setContentView(R.layout.drawer_layout);
-        mTerminalSessionMap = new HashMap<>();
         mLlTopSwitch = (LinearLayout) findViewById(R.id.ll_top_switch);
         mIvAdd = (ImageView) findViewById(R.id.iv_add);
         mIvMenu = (ImageView) findViewById(R.id.iv_menu);
@@ -434,9 +353,10 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             } else {
                 List<TerminalSession> sessions = mTermService.getSessions();
                 for (TerminalSession s : sessions) {
-                    String sessionName = addNewTopView();
-                    Log.i("wwww", sessionName);
-                    mTerminalSessionMap.put(sessionName, s);
+                    View v = addNewTopView();
+                    EmulatorBean bean = new EmulatorBean(v, s);
+                    mBeans.add(bean);
+                    ((TextView) bean.title).setText(String.valueOf(s.getPid()));
                 }
                 switchToSession(getStoredCurrentSessionOrLast());
             }
@@ -539,16 +459,14 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             new AlertDialog.Builder(this).setTitle(R.string.max_terminals_reached_title).setMessage(R.string.max_terminals_reached_message)
                 .setPositiveButton(android.R.string.ok, null).show();
         } else {
-            String sessionName = addNewTopView();
+            View v = addNewTopView();
             String executablePath = (failSafe ? "/system/bin/sh" : null);
             TerminalSession newSession = mTermService.createTermSession(executablePath, null, null, failSafe);
-            if (sessionName != null) {
-                newSession.mSessionName = sessionName;
-            }
+            EmulatorBean bean = new EmulatorBean(v, newSession);
+            mBeans.add(bean);
             switchToSession(newSession);
             getDrawer().closeDrawers();
-            mTerminalSessionMap.put(sessionName, newSession);
-            mCurrentTermSession = newSession;
+            ((TextView) bean.title).setText(String.valueOf(newSession.getPid()));
         }
     }
 
@@ -556,25 +474,23 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
      * Try switching to session and note about it, but do nothing if already displaying the session.
      */
     void switchToSession(TerminalSession session) {
+        if (session != getCurrentTermSession()) {
+            changeTitle(getCurrentTermSession(), false);
+        }
+        changeTitle(session, true);
         if (mTerminalView.attachSession(session)) {
             noteSessionInfo();
             updateBackgroundColor();
         }
     }
 
-    String toToastTitle(TerminalSession session) {
-        final int indexOfSession = mTermService.getSessions().indexOf(session);
-        StringBuilder toastTitle = new StringBuilder("[" + (indexOfSession + 1) + "]");
-        if (!TextUtils.isEmpty(session.mSessionName)) {
-            toastTitle.append(" ").append(session.mSessionName);
+    void changeTitle(TerminalSession session, boolean isSelected) {
+        for (EmulatorBean bean : mBeans) {
+            if (bean.session == session) {
+                bean.view.setSelected(isSelected);
+                break;
+            }
         }
-        String title = session.getTitle();
-        if (!TextUtils.isEmpty(title)) {
-            // Space to "[${NR}] or newline after session name:
-            toastTitle.append(session.mSessionName == null ? " " : "\n");
-            toastTitle.append(title);
-        }
-        return toastTitle.toString();
     }
 
     void noteSessionInfo() {
@@ -588,12 +504,26 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         TerminalSession currentSession = getCurrentTermSession();
         if (currentSession == null) return;
 
-        menu.add(Menu.NONE, CONTEXTMENU_SELECT_URL_ID, Menu.NONE, R.string.select_url);
-        menu.add(Menu.NONE, CONTEXTMENU_SHARE_TRANSCRIPT_ID, Menu.NONE, R.string.select_all_and_share);
-        menu.add(Menu.NONE, CONTEXTMENU_RESET_TERMINAL_ID, Menu.NONE, R.string.reset_terminal);
-        menu.add(Menu.NONE, CONTEXTMENU_KILL_PROCESS_ID, Menu.NONE, getResources().getString(R.string.kill_process, getCurrentTermSession().getPid())).setEnabled(currentSession.isRunning());
-        menu.add(Menu.NONE, CONTEXTMENU_STYLING_ID, Menu.NONE, R.string.style_terminal);
-        menu.add(Menu.NONE, CONTEXTMENU_HELP_ID, Menu.NONE, R.string.help);
+        menu.add(Menu.NONE, CONTEXTMENU_SHOW_MENU_ID,
+            Menu.NONE, R.string.show_menu);
+        menu.add(Menu.NONE, CONTEXTMENU_NEW_TAB_ID,
+            Menu.NONE, R.string.new_tab);
+        menu.add(Menu.NONE, CONTEXTMENU_CHANGE_TAB_ID,
+            Menu.NONE, R.string.change_tab);
+        menu.add(Menu.NONE, CONTEXTMENU_SELECT_URL_ID,
+            Menu.NONE, R.string.select_url);
+        menu.add(Menu.NONE, CONTEXTMENU_PASTE_ID,
+            Menu.NONE, R.string.paste);
+        menu.add(Menu.NONE, CONTEXTMENU_RESET_TERMINAL_ID,
+            Menu.NONE, R.string.reset_terminal);
+        menu.add(Menu.NONE, CONTEXTMENU_ZOOM_IN_ID,
+            Menu.NONE, R.string.zoom_in);
+        menu.add(Menu.NONE, CONTEXTMENU_ZOOM_OUT_ID,
+            Menu.NONE, R.string.zoom_out);
+        menu.add(Menu.NONE, CONTEXTMENU_KILL_PROCESS_ID,
+            Menu.NONE, getResources().getString(R.string.kill_process, getCurrentTermSession().getPid())).setEnabled(currentSession.isRunning());
+        menu.add(Menu.NONE, CONTEXTMENU_STYLING_ID,
+            Menu.NONE, R.string.style_terminal);
     }
 
     /**
@@ -651,17 +581,11 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         TerminalSession session = getCurrentTermSession();
 
         switch (item.getItemId()) {
+            case CONTEXTMENU_NEW_TAB_ID:
+                addNewSession(false);
+                return true;
             case CONTEXTMENU_SELECT_URL_ID:
                 showUrlSelection();
-                return true;
-            case CONTEXTMENU_SHARE_TRANSCRIPT_ID:
-                if (session != null) {
-                    Intent intent = new Intent(Intent.ACTION_SEND);
-                    intent.setType("text/plain");
-                    intent.putExtra(Intent.EXTRA_TEXT, session.getEmulator().getScreen().getTranscriptText().trim());
-                    intent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_transcript_title));
-                    startActivity(Intent.createChooser(intent, getString(R.string.share_transcript_chooser_title)));
-                }
                 return true;
             case CONTEXTMENU_PASTE_ID:
                 doPaste();
@@ -680,44 +604,26 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                 b.setNegativeButton(android.R.string.no, null);
                 b.show();
                 return true;
-            case CONTEXTMENU_RESET_TERMINAL_ID: {
+            case CONTEXTMENU_RESET_TERMINAL_ID:
                 if (session != null) {
                     session.reset();
                 }
                 return true;
-            }
-            case CONTEXTMENU_STYLING_ID: {
+            case CONTEXTMENU_STYLING_ID:
                 Intent stylingIntent = new Intent();
                 stylingIntent.setClassName(this, "com.termux.styling.TermuxStyleActivity");
-                try {
-                    startActivity(stylingIntent);
-                } catch (ActivityNotFoundException | IllegalArgumentException e) {
-                    // The startActivity() call is not documented to throw IllegalArgumentException.
-                    // However, crash reporting shows that it sometimes does, so catch it here.
-                    new AlertDialog.Builder(this).setMessage(R.string.styling_not_installed)
-                        .setPositiveButton(R.string.styling_install, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("http://play.google.com/store/apps/details?id=com.termux.styling")));
-                            }
-                        }).setNegativeButton(android.R.string.cancel, null).show();
-                }
+                startActivity(stylingIntent);
                 return true;
-            }
-            case CONTEXTMENU_HELP_ID:
-                startActivity(new Intent(this, TermuxHelpActivity.class));
+            case CONTEXTMENU_ZOOM_IN_ID:
+                changeFontSize(true);
+                return true;
+            case CONTEXTMENU_ZOOM_OUT_ID:
+                changeFontSize(false);
                 return true;
             default:
                 return super.onContextItemSelected(item);
         }
     }
-
-    //@Override
-    //public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
-    //    if (requestCode == REQUESTCODE_PERMISSION_STORAGE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-    //        TermuxInstaller.setupStorageSymlinks(this);
-    //    }
-    //}
 
     void changeFontSize(boolean increase) {
         mSettings.changeFontSize(this, increase);
@@ -746,8 +652,15 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     public void removeFinishedSession(TerminalSession finishedSession) {
         // Return pressed with finished session - remove it.
         TermuxService service = mTermService;
-
         int index = service.removeTermSession(finishedSession);
+        for (EmulatorBean bean : mBeans) {
+            if (bean.session == finishedSession) {
+                mLlTopSwitch.removeView(bean.view);
+                mBeans.remove(bean);
+                break;
+            }
+        }
+
         if (mTermService.getSessions().isEmpty()) {
             // There are no sessions to show, so finish the activity.
             finish();

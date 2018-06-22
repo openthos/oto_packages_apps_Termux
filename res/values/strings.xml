@@ -29,7 +29,7 @@
     <string name="select_url_copied_to_clipboard">URL copied to clipboard</string>
     <string name="share_transcript_chooser_title">Send text to:</string>
 
-    <string name="kill_process">Kill process (%d)</string>
+    <string name="kill_process">Kill process (%d) (Ctrl D)</string>
     <string name="confirm_kill_process">Really kill this session?</string>
 
     <string name="session_rename_title">Set session name</string>
@@ -47,5 +47,10 @@
     <string name="file_received_title">Save file in ~/downloads/</string>
     <string name="file_received_edit_button">Edit</string>
     <string name="file_received_open_folder_button">Open folder</string>
-
+    <string name="paste">Paste (Ctrl Shift V)</string>
+    <string name="zoom_in">Zoom in (Ctrl Alt +)</string>
+    <string name="zoom_out">Zoom out (Ctrl Alt -)</string>
+    <string name="new_tab">New Tab (Ctrl Shift N)</string>
+    <string name="show_menu">Show Menu (Ctrl Alt M)</string>
+    <string name="change_tab">Change Tab (Alt + "1~9,Left,Right")</string>
 </resources>
