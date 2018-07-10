@@ -31,10 +31,6 @@ public interface TerminalViewClient {
 
     boolean onKeyUp(int keyCode, KeyEvent e);
 
-    boolean readControlKey();
-
-    boolean readAltKey();
-
     boolean onCodePoint(int codePoint, boolean ctrlDown, TerminalSession session);
 
     boolean onLongPress(MotionEvent event);

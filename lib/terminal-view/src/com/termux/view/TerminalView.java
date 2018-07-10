@@ -718,8 +718,8 @@ public final class TerminalView extends View {
 
         if (mTermSession == null) return;
 
-        final boolean controlDown = controlDownFromEvent || mClient.readControlKey();
-        final boolean altDown = leftAltDownFromEvent || mClient.readAltKey();
+        final boolean controlDown = controlDownFromEvent;
+        final boolean altDown = leftAltDownFromEvent;
 
         if (mClient.onCodePoint(codePoint, controlDown, mTermSession)) return;
 

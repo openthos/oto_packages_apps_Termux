@@ -32,7 +32,6 @@ final class TermuxPreferences {
     private final int MIN_FONTSIZE;
     private static final int MAX_FONTSIZE = 256;
 
-    private static final String SHOW_EXTRA_KEYS_KEY = "show_extra_keys";
     private static final String FONTSIZE_KEY = "fontsize";
     private static final String CURRENT_SESSION_KEY = "current_session";
 
@@ -42,7 +41,6 @@ final class TermuxPreferences {
     int mBellBehaviour = BELL_VIBRATE;
 
     boolean mBackIsEscape;
-    boolean mShowExtraKeys;
 
     TermuxPreferences(Context context) {
         reloadFromProperties(context);
@@ -54,7 +52,6 @@ final class TermuxPreferences {
         // to prevent invisible text due to zoom be mistake:
         MIN_FONTSIZE = (int) (4f * dipInPixels);
 
-        mShowExtraKeys = prefs.getBoolean(SHOW_EXTRA_KEYS_KEY, false);
 
         // http://www.google.com/design/spec/style/typography.html#typography-line-height
         int defaultFontSize = Math.round(12 * dipInPixels);
@@ -67,16 +64,6 @@ final class TermuxPreferences {
             mFontSize = defaultFontSize;
         }
         mFontSize = Math.max(MIN_FONTSIZE, Math.min(mFontSize, MAX_FONTSIZE));
-    }
-
-    boolean isShowExtraKeys() {
-        return mShowExtraKeys;
-    }
-
-    boolean toggleShowExtraKeys(Context context) {
-        mShowExtraKeys = !mShowExtraKeys;
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(SHOW_EXTRA_KEYS_KEY, mShowExtraKeys).apply();
-        return mShowExtraKeys;
     }
 
     int getFontSize() {

@@ -93,8 +93,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     @NonNull
     TerminalView mTerminalView;
 
-    ExtraKeysView mExtraKeysView;
-
     TermuxPreferences mSettings;
 
     private LinearLayout mLlTopSwitch;

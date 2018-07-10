@@ -102,16 +102,6 @@ public final class TermuxViewClient implements TerminalViewClient {
     }
 
     @Override
-    public boolean readControlKey() {
-        return (mActivity.mExtraKeysView != null && mActivity.mExtraKeysView.readControlButton()) || mVirtualControlKeyDown;
-    }
-
-    @Override
-    public boolean readAltKey() {
-        return (mActivity.mExtraKeysView != null && mActivity.mExtraKeysView.readAltButton());
-    }
-
-    @Override
     public boolean onCodePoint(final int codePoint, boolean ctrlDown, TerminalSession session) {
         if (mVirtualFnKeyDown) {
             int resultingKeyCode = -1;
