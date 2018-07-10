@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -213,14 +214,18 @@ final class TermuxInstaller {
             Arrays.toString(Build.SUPPORTED_ABIS));
     }
 
-    /** Delete a folder and all its content or throw. */
-    static void deleteFolder(File fileOrDirectory) {
-        File[] children = fileOrDirectory.listFiles();
-        if (children != null) {
-            for (File child : children) {
-                deleteFolder(child);
+    /** Delete a folder and all its content or throw. Don't follow symlinks. */
+    static void deleteFolder(File fileOrDirectory) throws IOException {
+        if (fileOrDirectory.getCanonicalPath().equals(fileOrDirectory.getAbsolutePath()) && fileOrDirectory.isDirectory()) {
+            File[] children = fileOrDirectory.listFiles();
+
+            if (children != null) {
+                for (File child : children) {
+                    deleteFolder(child);
+                }
             }
         }
+
         if (!fileOrDirectory.delete()) {
             throw new RuntimeException("Unable to delete " + (fileOrDirectory.isDirectory() ? "directory " : "file ") + fileOrDirectory.getAbsolutePath());
         }
@@ -232,10 +237,13 @@ final class TermuxInstaller {
             public void run() {
                 try {
                     File storageDir = new File(TermuxService.HOME_PATH, "storage");
-
-                    if (storageDir.exists() && !storageDir.delete()) {
-                        Log.e(LOG_TAG, "Could not delete old $HOME/storage");
-                        return;
+                    if (storageDir.exists()) {
+                        try {
+                            deleteFolder(storageDir);
+                        } catch (IOException e) {
+                            Log.e(LOG_TAG, "Could not delete old $HOME/storage, " + e.getMessage());
+                            return;
+                        }
                     }
 
                     if (!storageDir.mkdirs()) {

@@ -90,12 +90,6 @@ public final class TermuxViewClient implements TerminalViewClient {
                 if (service.getSessions().size() > num)
                     mActivity.switchToSession(service.getSessions().get(num));
                 return true;
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                mActivity.switchToSession(true);
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                mActivity.switchToSession(false);
-                return true;
             }
         }
         return false;

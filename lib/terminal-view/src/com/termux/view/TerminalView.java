@@ -12,6 +12,7 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.accessibility.AccessibilityManager;
 import android.view.ActionMode;
 import android.view.InputDevice;
 import android.view.KeyCharacterMap;
@@ -89,6 +90,8 @@ public final class TerminalView extends View {
      * If non-zero, this is the last unicode code point received if that was a combining character.
      */
     int mCombiningAccent;
+
+    private boolean mAccessibilityEnabled;
 
     public TerminalView(Context context, AttributeSet attributes) { // NO_UCD (unused code)
         super(context, attributes);
@@ -250,6 +253,8 @@ public final class TerminalView extends View {
             }
         });
         mScroller = new Scroller(context);
+        AccessibilityManager am = (AccessibilityManager) context.getSystemService(context.ACCESSIBILITY_SERVICE);
+        mAccessibilityEnabled = am.isEnabled();
     }
 
     /**
@@ -437,6 +442,7 @@ public final class TerminalView extends View {
         mEmulator.clearScrollCounter();
 
         invalidate();
+        if (mAccessibilityEnabled) setContentDescription(getText());
     }
 
     /**
@@ -1037,5 +1043,10 @@ public final class TerminalView extends View {
         mClient.copyModeChanged(mIsSelectingText);
         mSelX1 = mSelY1 = mSelX2 = mSelY2 = -1;
         invalidate();
+    }
+
+ 
+    private CharSequence getText() {
+        return mEmulator.getScreen().getSelectedText(0, mTopRow, mEmulator.mColumns, mTopRow +mEmulator.mRows);
     }
 }

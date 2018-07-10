@@ -52,5 +52,5 @@
     <string name="zoom_out">Zoom out (Ctrl Alt -)</string>
     <string name="new_tab">New Tab (Ctrl Shift N)</string>
     <string name="show_menu">Show Menu (Ctrl Alt M)</string>
-    <string name="change_tab">Change Tab (Alt + "1~9,Left,Right")</string>
+    <string name="change_tab">Change Tab (Alt + "1~9")</string>
 </resources>
