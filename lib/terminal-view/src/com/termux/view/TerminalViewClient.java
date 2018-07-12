@@ -25,8 +25,6 @@ public interface TerminalViewClient {
 
     boolean shouldBackButtonBeMappedToEscape();
 
-    void copyModeChanged(boolean copyMode);
-
     boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession session);
 
     boolean onKeyUp(int keyCode, KeyEvent e);

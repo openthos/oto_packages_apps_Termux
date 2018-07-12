@@ -20,7 +20,6 @@ import android.os.IBinder;
 import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.widget.DrawerLayout;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -244,16 +243,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         mBellSoundId = mBellSoundPool.load(this, R.raw.bell, 1);
     }
 
-//    void toggleShowExtraKeys() {
-//        final ViewPager viewPager = (ViewPager) findViewById(R.id.viewpager);
-//        final boolean showNow = mSettings.toggleShowExtraKeys(TermuxActivity.this);
-//        viewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
-//        if (showNow && viewPager.getCurrentItem() == 1) {
-//            // Focus the text input view if just revealed.
-//            findViewById(R.id.text_input).requestFocus();
-//        }
-//    }
-
     /**
      * Part of the {@link ServiceConnection} interface. The service is bound with
      * {@link #bindService(Intent, ServiceConnection, int)} in {@link #onCreate(Bundle)} which will cause a call to this
@@ -332,7 +321,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                         if (mTermService == null) return; // Activity might have been destroyed.
                         try {
                             addNewSession(false);
-                            setDrawerLayoutTopMargin();
                         } catch (WindowManager.BadTokenException e) {
                             // Activity finished - ignore.
                         }
@@ -347,7 +335,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             if (i != null && Intent.ACTION_RUN.equals(i.getAction())) {
                 // Android 7.1 app shortcut from res/xml/shortcuts.xml.
                 addNewSession(false);
-                setDrawerLayoutTopMargin();
             } else {
                 List<TerminalSession> sessions = mTermService.getSessions();
                 for (TerminalSession s : sessions) {
@@ -361,14 +348,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         }
     }
 
-    private void setDrawerLayoutTopMargin() {
-        RelativeLayout.LayoutParams drawerParams = new RelativeLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        mLlTopSwitch.measure(0, 0);
-        drawerParams.topMargin = mLlTopSwitch.getMeasuredHeight();
-        getDrawer().setLayoutParams(drawerParams);
-    }
-
     public void switchToSession(boolean forward) {
         TerminalSession currentSession = getCurrentTermSession();
         int index = mTermService.getSessions().indexOf(currentSession);
@@ -378,16 +357,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             if (--index < 0) index = mTermService.getSessions().size() - 1;
         }
         switchToSession(mTermService.getSessions().get(index));
-    }
-
-    @SuppressLint("InflateParams")
-    void renameSession(final TerminalSession sessionToRename) {
-        DialogUtils.textInput(this, R.string.session_rename_title, sessionToRename.mSessionName, R.string.session_rename_positive_button, new DialogUtils.TextSetListener() {
-            @Override
-            public void onTextSet(String text) {
-                sessionToRename.mSessionName = text;
-            }
-        }, -1, null, -1, null, null);
     }
 
     @Override
@@ -425,16 +394,11 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         TerminalSession currentSession = getCurrentTermSession();
         if (currentSession != null) TermuxPreferences.storeCurrentSession(this, currentSession);
         unregisterReceiver(mBroadcastReceiever);
-        getDrawer().closeDrawers();
     }
 
     @Override
     public void onBackPressed() {
-        if (getDrawer().isDrawerOpen(Gravity.LEFT)) {
-            getDrawer().closeDrawers();
-        } else {
-            finish();
-        }
+        finish();
     }
 
     @Override
@@ -448,10 +412,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         unbindService(this);
     }
 
-    DrawerLayout getDrawer() {
-        return (DrawerLayout) findViewById(R.id.drawer_layout);
-    }
-
     void addNewSession(boolean failSafe) {
         if (mTermService.getSessions().size() >= MAX_SESSIONS) {
             new AlertDialog.Builder(this).setTitle(R.string.max_terminals_reached_title).setMessage(R.string.max_terminals_reached_message)
@@ -463,7 +423,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             EmulatorBean bean = new EmulatorBean(v, newSession);
             mBeans.add(bean);
             switchToSession(newSession);
-            getDrawer().closeDrawers();
             ((TextView) bean.title).setText(String.valueOf(newSession.getPid()));
         }
     }
@@ -477,7 +436,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         }
         changeTitle(session, true);
         if (mTerminalView.attachSession(session)) {
-            noteSessionInfo();
             updateBackgroundColor();
         }
     }
@@ -489,12 +447,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                 break;
             }
         }
-    }
-
-    void noteSessionInfo() {
-        if (!mIsVisible) return;
-        TerminalSession session = getCurrentTermSession();
-        final int indexOfSession = mTermService.getSessions().indexOf(session);
     }
 
     @Override

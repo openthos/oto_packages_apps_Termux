@@ -50,12 +50,6 @@ public final class TermuxViewClient implements TerminalViewClient {
     }
 
     @Override
-    public void copyModeChanged(boolean copyMode) {
-        // Disable drawer while copying.
-        mActivity.getDrawer().setDrawerLockMode(copyMode ? DrawerLayout.LOCK_MODE_LOCKED_CLOSED : DrawerLayout.LOCK_MODE_UNLOCKED);
-    }
-
-    @Override
     public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession currentSession) {
         if (handleVirtualKeys(keyCode, e, true)) return true;
 
@@ -217,9 +211,6 @@ public final class TermuxViewClient implements TerminalViewClient {
                                 return true;
                             case TermuxPreferences.SHORTCUT_ACTION_NEXT_SESSION:
                                 mActivity.switchToSession(true);
-                                return true;
-                            case TermuxPreferences.SHORTCUT_ACTION_RENAME_SESSION:
-                                mActivity.renameSession(mActivity.getCurrentTermSession());
                                 return true;
                         }
                     }
