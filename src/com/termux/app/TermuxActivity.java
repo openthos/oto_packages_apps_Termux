@@ -97,6 +97,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     private LinearLayout mLlTopSwitch;
     private ImageView mIvAdd, mIvMenu;
     private ArrayList<EmulatorBean> mBeans = new ArrayList<>();
+    private int INDEX = 0;
 
     /**
      * The connection to the {@link TermuxService}. Requested in {@link #onCreate(Bundle)} with a call to
@@ -171,13 +172,16 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     }
 
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
 
     private View addNewTopView() {
         View v = View.inflate(this, R.layout.tab_item, null);
         v.findViewById(R.id.close).setOnClickListener(this);
         v.findViewById(R.id.title).setOnClickListener(this);
-        mLlTopSwitch.addView(v, params);
+        LinearLayout.LayoutParams temp = new LinearLayout.LayoutParams(
+                0, 0, MAX_SESSIONS - mLlTopSwitch.getChildCount());
+        mLlTopSwitch.addView(v, mLlTopSwitch.getChildCount() -1, params);
+        mLlTopSwitch.findViewById(R.id.blank).setLayoutParams(temp);
         return v;
     }
 
@@ -341,7 +345,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
                     View v = addNewTopView();
                     EmulatorBean bean = new EmulatorBean(v, s);
                     mBeans.add(bean);
-                    ((TextView) bean.title).setText(String.valueOf(s.getPid()));
+                    ((TextView) bean.title).setText("Session " + (++INDEX));
                 }
                 switchToSession(getStoredCurrentSessionOrLast());
             }
@@ -423,7 +427,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             EmulatorBean bean = new EmulatorBean(v, newSession);
             mBeans.add(bean);
             switchToSession(newSession);
-            ((TextView) bean.title).setText(String.valueOf(newSession.getPid()));
+            ((TextView) bean.title).setText("Session " + (++INDEX));
         }
     }
 
@@ -606,6 +610,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
         for (EmulatorBean bean : mBeans) {
             if (bean.session == finishedSession) {
                 mLlTopSwitch.removeView(bean.view);
+                LinearLayout.LayoutParams temp = new LinearLayout.LayoutParams(
+                        0, 0, MAX_SESSIONS - mLlTopSwitch.getChildCount() + 1);
+                mLlTopSwitch.findViewById(R.id.blank).setLayoutParams(temp);
                 mBeans.remove(bean);
                 break;
             }

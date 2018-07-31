@@ -38,7 +38,12 @@
             android:layout_alignParentTop="true"
             android:layout_toLeftOf="@+id/iv_add"
             android:orientation="horizontal"
-            android:padding="5dp" />
+            android:padding="5dp">
+            <View
+                android:id="@+id/blank"
+                android:layout_width="0dp"
+                android:layout_height="0dp" />
+        </LinearLayout>
 
     </RelativeLayout>
 
