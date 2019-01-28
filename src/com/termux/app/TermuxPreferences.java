@@ -12,8 +12,10 @@ import com.termux.terminal.TerminalSession;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -92,41 +94,38 @@ final class TermuxPreferences {
     }
 
     public void reloadFromProperties(Context context) {
-        try {
-            File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
-            if (!propsFile.exists())
-                propsFile = new File(TermuxService.HOME_PATH + "/.config/termux/termux.properties");
+        File propsFile = new File(TermuxService.HOME_PATH + "/.termux/termux.properties");
+        if (!propsFile.exists())
+            propsFile = new File(TermuxService.HOME_PATH + "/.config/termux/termux.properties");
 
-            Properties props = new Properties();
+        Properties props = new Properties();
+        try {
             if (propsFile.isFile() && propsFile.canRead()) {
                 try (FileInputStream in = new FileInputStream(propsFile)) {
                     props.load(in);
                 }
             }
-
-            switch (props.getProperty("bell-character", "vibrate")) {
-                case "beep":
-                    mBellBehaviour = BELL_BEEP;
-                    break;
-                case "ignore":
-                    mBellBehaviour = BELL_IGNORE;
-                    break;
-                default: // "vibrate".
-                    mBellBehaviour = BELL_VIBRATE;
-                    break;
-            }
-
-            mBackIsEscape = "escape".equals(props.getProperty("back-key", "back"));
-
-            shortcuts.clear();
-            parseAction("shortcut.create-session", SHORTCUT_ACTION_CREATE_SESSION, props);
-            parseAction("shortcut.next-session", SHORTCUT_ACTION_NEXT_SESSION, props);
-            parseAction("shortcut.previous-session", SHORTCUT_ACTION_PREVIOUS_SESSION, props);
-            parseAction("shortcut.rename-session", SHORTCUT_ACTION_RENAME_SESSION, props);
-        } catch (Exception e) {
+        } catch (IOException e) {
             Toast.makeText(context, "Error loading properties: " + e.getMessage(), Toast.LENGTH_LONG).show();
             Log.e("termux", "Error loading props", e);
         }
+        switch (props.getProperty("bell-character", "vibrate")) {
+            case "beep":
+                mBellBehaviour = BELL_BEEP;
+                break;
+            case "ignore":
+                mBellBehaviour = BELL_IGNORE;
+                break;
+            default: // "vibrate".
+                mBellBehaviour = BELL_VIBRATE;
+                break;
+        }
+        mBackIsEscape = "escape".equals(props.getProperty("back-key", "back"));
+        shortcuts.clear();
+        parseAction("shortcut.create-session", SHORTCUT_ACTION_CREATE_SESSION, props);
+        parseAction("shortcut.next-session", SHORTCUT_ACTION_NEXT_SESSION, props);
+        parseAction("shortcut.previous-session", SHORTCUT_ACTION_PREVIOUS_SESSION, props);
+        parseAction("shortcut.rename-session", SHORTCUT_ACTION_RENAME_SESSION, props);
     }
 
     public static final int SHORTCUT_ACTION_CREATE_SESSION = 1;

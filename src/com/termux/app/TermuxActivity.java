@@ -107,11 +107,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
     TermuxService mTermService;
 
     /**
-     * Initialized in {@link #onServiceConnected(ComponentName, IBinder)}.
-     */
-    ArrayAdapter<TerminalSession> mListViewAdapter;
-
-    /**
      * If between onResume() and onStop(). Note that only one session is in the foreground of the terminal view at the
      * time, so if the session causing a change is not in the foreground it should probably be treated as background.
      */
@@ -514,7 +509,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection,
             return;
         }
 
-        final CharSequence[] urls = urlSet.toArray(new CharSequence[urlSet.size()]);
+        final CharSequence[] urls = urlSet.toArray(new CharSequence[0]);
         Collections.reverse(Arrays.asList(urls)); // Latest first.
 
         // Click to copy url to clipboard:
